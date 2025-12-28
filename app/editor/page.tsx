@@ -1,5 +1,5 @@
 "use client";
-import { useState, Suspense } from "react";
+import { useState, Suspense, useEffect } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import Editor from "@monaco-editor/react";
@@ -33,35 +33,80 @@ function EditorContent() {
   const [matchScore, setMatchScore] = useState<number | null>(null);
   const [scanning, setScanning] = useState(false);
 
+  // Scale State for Preview
+  const [scale, setScale] = useState(1);
+
+  // --- RESPONSIVE SCALING LOGIC ---
+  useEffect(() => {
+    const handleResize = () => {
+      // Calculate scale based on screen width to fit A4 (210mm approx 794px)
+      const containerWidth =
+        window.innerWidth < 768 ? window.innerWidth : window.innerWidth * 0.5; // Mobile vs Desktop (50% width)
+      const a4WidthPx = 794;
+      const padding = 40;
+      // Determine safe scale factor
+      const newScale = Math.min(1, (containerWidth - padding) / a4WidthPx);
+      setScale(newScale);
+    };
+
+    handleResize(); // Initial calc
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   // --- HANDLERS ---
   const handleTemplateChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const key = e.target.value as keyof typeof templates;
     setSelectedTemplate(key);
     setCode(templates[key]);
-    setShowMobileMenu(false); // Close mobile menu after selection
+    setShowMobileMenu(false);
   };
 
+  // --- THE "BULLETPROOF" PREVIEW GENERATOR ---
   const getPreviewHtml = (htmlContent: string) => {
     return `
       <!DOCTYPE html>
-      <html>
+      <html lang="en">
         <head>
           <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <script src="https://cdn.tailwindcss.com"></script>
           <style>
+            /* --- SAFETY CSS: Forces A4 behavior --- */
             @page { margin: 0; size: auto; }
-            body { padding: 0; margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            
+            html, body {
+                margin: 0;
+                padding: 0;
+                width: 210mm; /* FORCE A4 Width */
+                min-height: 297mm; /* FORCE A4 Height */
+                background: white;
+                /* Essential for printing background colors */
+                -webkit-print-color-adjust: exact; 
+                print-color-adjust: exact; 
+                overflow-x: hidden; /* Prevent horizontal scrollbars from breaking UI */
+            }
+
+            /* Force standard font size to prevent massive text */
+            body { font-size: 12pt; }
+
+            /* Scrollbar hiding for cleaner preview */
             ::-webkit-scrollbar { width: 0px; background: transparent; }
+            
+            /* --- PREVENT OVERFLOWS --- */
+            * {
+                max-width: 100%; /* Prevent elements from bursting out */
+                box-sizing: border-box;
+            }
           </style>
         </head>
-        <body class="bg-white">
+        <body>
           ${htmlContent}
         </body>
       </html>
     `;
   };
 
-  // --- DOWNLOAD STRATEGIES (Preserved) ---
   const downloadViaServer = async () => {
     setLoading(true);
     try {
@@ -126,18 +171,12 @@ function EditorContent() {
       (window.location.hostname === "localhost" ||
         window.location.hostname === "127.0.0.1");
 
-    if (isLocal) {
-      downloadViaServer();
-    } else {
-      downloadViaClient();
-    }
+    if (isLocal) downloadViaServer();
+    else downloadViaClient();
   };
 
   const handleScan = async () => {
-    if (!jobDesc.trim()) {
-      alert("Please paste a Job Description first!");
-      return;
-    }
+    if (!jobDesc.trim()) return alert("Please paste a Job Description first!");
     setScanning(true);
     try {
       const textToScan = code.replace(/<[^>]*>?/gm, " ");
@@ -158,7 +197,7 @@ function EditorContent() {
 
   return (
     <div className="flex flex-col h-screen bg-gray-50 overflow-hidden">
-      {/* --- RESPONSIVE NAVBAR --- */}
+      {/* NAVBAR */}
       <div className="h-16 bg-white border-b flex items-center justify-between px-4 sm:px-6 z-20 shrink-0">
         <div className="flex items-center gap-4">
           <Link
@@ -169,11 +208,7 @@ function EditorContent() {
             <span className="font-medium hidden sm:inline">Back</span>
             <span className="font-medium sm:hidden">Home</span>
           </Link>
-
-          {/* Desktop Separator */}
           <div className="h-6 w-px bg-gray-200 mx-2 hidden md:block"></div>
-
-          {/* Desktop Template Selector */}
           <div className="hidden md:flex items-center gap-2">
             <span className="text-sm text-gray-500">Template:</span>
             <select
@@ -191,7 +226,6 @@ function EditorContent() {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Mobile Menu Button */}
           <button
             className="md:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
             onClick={() => setShowMobileMenu(!showMobileMenu)}
@@ -199,7 +233,6 @@ function EditorContent() {
             {showMobileMenu ? <X size={24} /> : <Menu size={24} />}
           </button>
 
-          {/* Desktop Actions */}
           <div className="hidden md:flex items-center gap-3">
             <button
               onClick={() => setShowScanner(true)}
@@ -225,7 +258,7 @@ function EditorContent() {
         </div>
       </div>
 
-      {/* --- MOBILE SETTINGS DRAWER --- */}
+      {/* MOBILE MENU */}
       {showMobileMenu && (
         <div className="md:hidden absolute top-16 left-0 w-full bg-white border-b shadow-lg z-30 p-4 space-y-4 animate-in slide-in-from-top-2">
           <div>
@@ -264,16 +297,13 @@ function EditorContent() {
         </div>
       )}
 
-      {/* --- MAIN CONTENT --- */}
+      {/* MAIN CONTENT */}
       <div className="flex flex-1 overflow-hidden relative">
-        {/* EDITOR PANE */}
-        {/* On mobile: hidden if tab is 'preview'. On Desktop: always visible (w-1/2) */}
+        {/* EDITOR */}
         <div
-          className={`
-            bg-white border-r border-gray-200 transition-all duration-300
-            ${mobileTab === "editor" ? "flex-1" : "hidden"} 
-            md:block md:w-1/2 md:flex-none
-        `}
+          className={`bg-white border-r border-gray-200 transition-all duration-300 ${
+            mobileTab === "editor" ? "flex-1" : "hidden"
+          } md:block md:w-1/2 md:flex-none`}
         >
           <Editor
             height="100%"
@@ -286,40 +316,52 @@ function EditorContent() {
               fontSize: 14,
               wordWrap: "on",
               padding: { top: 20 },
-              lineNumbers: "off", // Cleaner on mobile
-              folding: false, // Cleaner on mobile
+              lineNumbers: "off",
+              folding: false,
             }}
           />
         </div>
 
-        {/* PREVIEW PANE */}
-        {/* On mobile: hidden if tab is 'editor'. On Desktop: always visible (w-1/2) */}
+        {/* PREVIEW */}
         <div
-          className={`
-            bg-gray-100 flex justify-center overflow-y-auto p-4 md:p-8
-            ${mobileTab === "preview" ? "flex-1" : "hidden"} 
-            md:flex md:w-1/2 md:flex-none
-        `}
+          className={`bg-gray-100 flex flex-col items-center overflow-hidden ${
+            mobileTab === "preview" ? "flex-1" : "hidden"
+          } md:flex md:w-1/2 md:flex-none relative`}
         >
-          <div className="w-full max-w-[210mm] bg-white shadow-2xl origin-top transition-transform">
-            {/* Responsive Scale Logic:
-                Mobile: scale down significantly to fit width
-                Tablet: scale slightly
-                Desktop: scale normal or 0.9 
+          {/* Scale Controller / Info */}
+          <div className="absolute top-4 right-4 bg-white/80 backdrop-blur px-3 py-1 rounded-full text-xs font-medium text-gray-500 shadow-sm z-10 border border-gray-200">
+            A4 Preview ({Math.round(scale * 100)}%)
+          </div>
+
+          {/* SCROLLABLE CONTAINER */}
+          <div className="flex-1 w-full overflow-y-auto p-4 md:p-8 flex justify-center items-start">
+            {/* THE MAGIC WRAPPER:
+                 1. Fixed width/height to match A4 (210mm x 297mm)
+                 2. Scaled down using CSS transform to fit the screen
+                 3. Origin top center ensures it scales neatly from the top
              */}
-            <div className="w-full h-[600px] md:h-full overflow-hidden relative">
+            <div
+              style={{
+                transform: `scale(${scale})`,
+                transformOrigin: "top center",
+                width: "210mm",
+                minHeight: "297mm",
+              }}
+              className="bg-white shadow-2xl transition-transform duration-200 ease-out shrink-0"
+            >
               <iframe
                 srcDoc={getPreviewHtml(code)}
-                className="w-[210mm] h-full border-none absolute top-0 left-0 origin-top-left scale-[0.48] sm:scale-[0.7] md:scale-100"
+                className="w-full h-full border-none block"
                 title="Resume Preview"
-                style={{ height: "100%", minHeight: "297mm" }}
+                // Important: The iframe itself must be tall enough
+                style={{ minHeight: "297mm", height: "100%" }}
               />
             </div>
           </div>
         </div>
       </div>
 
-      {/* --- MOBILE BOTTOM TABS --- */}
+      {/* MOBILE TABS */}
       <div className="md:hidden h-16 bg-white border-t flex justify-around items-center shrink-0 z-20 pb-safe shadow-[0_-1px_3px_rgba(0,0,0,0.05)]">
         <button
           onClick={() => setMobileTab("editor")}
@@ -346,7 +388,7 @@ function EditorContent() {
         </button>
       </div>
 
-      {/* --- SCANNER MODAL (Responsive) --- */}
+      {/* SCANNER MODAL */}
       {showScanner && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl p-6 md:p-8 flex flex-col max-h-[90vh]">
@@ -383,7 +425,7 @@ function EditorContent() {
               </button>
 
               {matchScore !== null && (
-                <div className="mt-4 p-5 bg-gray-50 rounded-xl border border-gray-100 animate-in fade-in zoom-in duration-300">
+                <div className="mt-4 p-5 bg-gray-50 rounded-xl border border-gray-100">
                   <div className="flex justify-between items-end mb-2">
                     <span className="font-semibold text-gray-900">
                       Match Score
