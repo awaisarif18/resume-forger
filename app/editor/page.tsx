@@ -214,7 +214,7 @@ function EditorContent() {
             <select
               value={selectedTemplate}
               onChange={handleTemplateChange}
-              className="bg-gray-100 border-none rounded-md px-3 py-1.5 text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
+              className="bg-gray-100 border-none rounded-md px-3 py-1.5 text-sm text-black font-medium focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
             >
               {Object.keys(templates).map((t) => (
                 <option key={t} value={t}>

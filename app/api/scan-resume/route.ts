@@ -1,192 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-
-// 1. LIST OF COMMON "NOISE" WORDS TO IGNORE
-const STOP_WORDS = new Set([
-  "a",
-  "about",
-  "above",
-  "after",
-  "again",
-  "against",
-  "all",
-  "am",
-  "an",
-  "and",
-  "any",
-  "are",
-  "aren't",
-  "as",
-  "at",
-  "be",
-  "because",
-  "been",
-  "before",
-  "being",
-  "below",
-  "between",
-  "both",
-  "but",
-  "by",
-  "can",
-  "cannot",
-  "could",
-  "couldn't",
-  "did",
-  "didn't",
-  "do",
-  "does",
-  "doesn't",
-  "doing",
-  "don't",
-  "down",
-  "during",
-  "each",
-  "few",
-  "for",
-  "from",
-  "further",
-  "had",
-  "hadn't",
-  "has",
-  "hasn't",
-  "have",
-  "haven't",
-  "having",
-  "he",
-  "he'd",
-  "he'll",
-  "he's",
-  "her",
-  "here",
-  "here's",
-  "hers",
-  "herself",
-  "him",
-  "himself",
-  "his",
-  "how",
-  "how's",
-  "i",
-  "i'd",
-  "i'll",
-  "i'm",
-  "i've",
-  "if",
-  "in",
-  "into",
-  "is",
-  "isn't",
-  "it",
-  "it's",
-  "its",
-  "itself",
-  "let's",
-  "me",
-  "more",
-  "most",
-  "mustn't",
-  "my",
-  "myself",
-  "no",
-  "nor",
-  "not",
-  "of",
-  "off",
-  "on",
-  "once",
-  "only",
-  "or",
-  "other",
-  "ought",
-  "our",
-  "ours",
-  "ourselves",
-  "out",
-  "over",
-  "own",
-  "same",
-  "shan't",
-  "she",
-  "she'd",
-  "she'll",
-  "she's",
-  "should",
-  "shouldn't",
-  "so",
-  "some",
-  "such",
-  "than",
-  "that",
-  "that's",
-  "the",
-  "their",
-  "theirs",
-  "them",
-  "themselves",
-  "then",
-  "there",
-  "there's",
-  "these",
-  "they",
-  "they'd",
-  "they'll",
-  "they're",
-  "they've",
-  "this",
-  "those",
-  "through",
-  "to",
-  "too",
-  "under",
-  "until",
-  "up",
-  "very",
-  "was",
-  "wasn't",
-  "we",
-  "we'd",
-  "we'll",
-  "we're",
-  "we've",
-  "were",
-  "weren't",
-  "what",
-  "what's",
-  "when",
-  "when's",
-  "where",
-  "where's",
-  "which",
-  "while",
-  "who",
-  "who's",
-  "whom",
-  "why",
-  "why's",
-  "with",
-  "won't",
-  "would",
-  "wouldn't",
-  "you",
-  "you'd",
-  "you'll",
-  "you're",
-  "you've",
-  "your",
-  "yours",
-  "yourself",
-  "yourselves",
-  "will",
-  "management",
-  "system",
-  "working",
-  "experience",
-  "responsible",
-  "duties",
-  "include",
-  "team",
-  "work", // Added some generic business filler words
-]);
+import { STOP_WORDS } from "@/utils/stopWords";
 
 // Helper: Clean and Tokenize text
 function tokenize(text: string): string[] {
@@ -243,7 +56,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing text" }, { status: 400 });
     }
 
-    // 1. Tokenize (Now with Stop Word Filtering)
+    // 1. Tokenize
     const resumeTokens = tokenize(resumeText);
     const jobTokens = tokenize(jobDesc);
 
@@ -260,24 +73,21 @@ export async function POST(req: NextRequest) {
       resumeTokens.includes(word)
     );
 
-    // Safety check for empty job description after filtering
     const keywordScore =
       uniqueJobWords.length > 0
         ? (matchedWords.length / uniqueJobWords.length) * 100
         : 0;
 
     // 5. Final Weighted Score
-    // We reduced the boost curve significantly.
-    // Before: min(98, score * 1.5 + 15)
-    // Now: We only boost if the raw score is decent (>20)
-
     let finalScore = cosineSim * 0.4 + keywordScore * 0.6;
 
-    // STRICTER BOOST LOGIC:
-    // If score is very low (< 20%), it means fields are unrelated. Don't boost.
-    // If score is decent (> 20%), apply a smaller curve.
-    if (finalScore > 20) {
-      finalScore = Math.min(95, finalScore * 1.2 + 5);
+    // 6. Boost Logic
+    if (finalScore > 50) {
+      finalScore = Math.min(98, finalScore * 1.5 + 15);
+    } else if (finalScore > 30) {
+      finalScore = Math.min(88, finalScore * 1.5 + 10);
+    } else if (finalScore > 15) {
+      finalScore = finalScore * 1.2;
     }
 
     return NextResponse.json({
