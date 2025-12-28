@@ -1,7 +1,0 @@
-{
-  "functions": {
-    "src/app/api/scan-resume/route.ts": {
-      "includeFiles": "scripts/**"
-    }
-  }
-}

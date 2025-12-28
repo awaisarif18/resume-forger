@@ -32,7 +32,7 @@ export default function Navbar() {
               Editor
             </Link>
             <a
-              href="https://github.com/your-username"
+              href="https://github.com/awaisarif18/resume-forger"
               target="_blank"
               className="flex items-center gap-2 text-sm font-medium text-gray-900 bg-gray-100 px-4 py-2 rounded-full hover:bg-gray-200 transition-colors"
             >
