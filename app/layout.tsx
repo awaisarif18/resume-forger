@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import Footer from "@/components/Footer"; // 1. Import the Footer
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -13,9 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  // 1. THIS IS THE FIX FOR THE WARNING
   metadataBase: new URL("https://resume-forger.vercel.app"),
-
   title: {
     default: "Resume Forger | Free AI Resume Builder & ATS Scanner",
     template: "%s | Resume Forger",
@@ -35,7 +34,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "/", // Relative path is fine now because we set metadataBase
+    url: "/",
     title: "Resume Forger - Build a Winner Resume",
     description:
       "Stop guessing keywords. Real-time ATS scoring and instant PDF export.",
@@ -53,13 +52,12 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Resume Forger | Free AI Resume Builder",
     description: "Build ATS-friendly resumes in minutes. No watermarks.",
-    // creator: "@yourhandle",
     images: ["/og-image.png"],
   },
   icons: {
-    icon: "/logo.png", // Uses your new logo for the tab
+    icon: "/logo.png",
     shortcut: "/logo.png",
-    apple: "/logo.png", // Uses it for iPhone home screen bookmarks
+    apple: "/logo.png",
   },
 };
 
@@ -71,9 +69,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen`}
       >
-        {children}
+        <main className="flex-grow">{children}</main>
+
+        <Footer />
       </body>
     </html>
   );
