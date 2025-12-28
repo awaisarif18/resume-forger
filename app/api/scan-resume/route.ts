@@ -10,30 +10,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing text" }, { status: 400 });
     }
 
-    // 1. Locate the script
-    // process.cwd() is the root folder in both Local and Vercel
     const scriptPath = path.join(process.cwd(), "scripts", "scan_resume.py");
-
-    // 2. Select Python Interpreter
-    // Windows uses 'python', Vercel (Linux) uses 'python3'
     const pythonCommand = process.platform === "win32" ? "python" : "python3";
 
-    return new Promise((resolve) => {
+    // FIX: Explicitly tell TypeScript this Promise returns a NextResponse
+    return new Promise<NextResponse>((resolve) => {
       const pythonProcess = spawn(pythonCommand, [scriptPath]);
 
       let result = "";
       let error = "";
 
-      // Send data to Python script
       pythonProcess.stdin.write(JSON.stringify({ resumeText, jobDesc }));
       pythonProcess.stdin.end();
 
-      // Collect data
       pythonProcess.stdout.on("data", (data) => {
         result += data.toString();
       });
 
-      // Collect errors
       pythonProcess.stderr.on("data", (data) => {
         error += data.toString();
       });
@@ -49,13 +42,15 @@ export async function POST(req: NextRequest) {
           );
         } else {
           try {
-            // Parse the JSON output from Python
             const parsed = JSON.parse(result);
             resolve(NextResponse.json(parsed));
           } catch (e) {
             console.error("Invalid JSON from Python:", result);
             resolve(
-              NextResponse.json({ error: "Invalid response" }, { status: 500 })
+              NextResponse.json(
+                { error: "Invalid response from AI engine" },
+                { status: 500 }
+              )
             );
           }
         }
