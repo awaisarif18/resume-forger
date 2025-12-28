@@ -14,42 +14,39 @@ export async function POST(req: NextRequest) {
 
     if (process.env.NODE_ENV === "development") {
       // --- Local Development (Windows) ---
-      // Make sure this path is correct for YOUR computer!
-      // Common paths:
-      // "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
-      // "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"
-      const localExecutablePath =
-        process.env.CHROMIUM_PATH ||
-        "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
-
+      const localExecutablePath = process.env.CHROMIUM_PATH || "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
+      
       browser = await puppeteer.launch({
         executablePath: localExecutablePath,
         headless: true,
       });
+      
     } else {
       // --- Vercel Production (Linux) ---
-      // We set graphics mode to 'false' to save memory
-      chromium.setGraphicsMode = false;
-
+      // 1. Load the font (Critical for text to appear)
+      await chromium.font("https://github.com/googlefonts/noto-emoji/raw/main/fonts/NotoColorEmoji.ttf");
+      
+      // 2. Launch with "min" settings
       browser = await puppeteer.launch({
-        args: chromium.args,
+        args: [...chromium.args, "--hide-scrollbars", "--disable-web-security"],
         defaultViewport: chromium.defaultViewport,
         executablePath: await chromium.executablePath(),
         headless: chromium.headless,
+        ignoreHTTPSErrors: true,
       });
     }
 
     const page = await browser.newPage();
-
-    // Set content and wait for fonts to load
-    await page.setContent(html, {
-      waitUntil: "networkidle0",
+    
+    // Set content
+    await page.setContent(html, { 
+      waitUntil: "networkidle0" 
     });
 
-    const pdfBuffer = await page.pdf({
-      format: "A4",
+    const pdfBuffer = await page.pdf({ 
+      format: "A4", 
       printBackground: true,
-      margin: { top: "20px", bottom: "20px" },
+      margin: { top: "20px", bottom: "20px" } 
     });
 
     await browser.close();
@@ -60,6 +57,7 @@ export async function POST(req: NextRequest) {
         "Content-Disposition": 'attachment; filename="resume.pdf"',
       },
     });
+
   } catch (error: any) {
     console.error("PDF Gen Error:", error);
     return NextResponse.json(

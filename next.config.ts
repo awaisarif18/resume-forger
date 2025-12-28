@@ -1,14 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // 1. Tell Vercel to treat these as "External" packages (Don't bundle them)
+  serverExternalPackages: ["puppeteer-core", "@sparticuz/chromium"],
 
-  // 1. Ignore TypeScript Errors during build
+  // 2. Ignore Build Errors (Keep this for safety as discussed before)
   typescript: {
     ignoreBuildErrors: true,
   },
-
-  // 2. Ignore ESLint Errors during build
   eslint: {
     ignoreDuringBuilds: true,
   },
