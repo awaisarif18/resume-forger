@@ -1,49 +1,45 @@
 import { NextRequest, NextResponse } from "next/server";
 import puppeteer from "puppeteer-core";
-import chromium from "@sparticuz/chromium";
 
 export async function POST(req: NextRequest) {
+  // SECURITY: Block this route on Vercel so it doesn't crash the server
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json(
+      {
+        error:
+          "Server-side PDF generation is disabled in production. Please use client-side printing.",
+      },
+      { status: 403 }
+    );
+  }
+
   try {
     const { html } = await req.json();
 
     if (!html) {
-      return NextResponse.json({ error: "Missing HTML" }, { status: 400 });
-    }
-
-    let browser;
-
-    if (process.env.NODE_ENV === "development") {
-      // --- Local Development (Windows) ---
-      const localExecutablePath =
-        process.env.CHROMIUM_PATH ||
-        "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
-      browser = await puppeteer.launch({
-        executablePath: localExecutablePath,
-        headless: true,
-      });
-    } else {
-      // --- Vercel Production (Linux) ---
-
-      // 1. Force the library to download the binary from a stable URL
-      // This bypasses the "missing file" error on Vercel
-      const executablePath = await chromium.executablePath(
-        "https://github.com/Sparticuz/chromium/releases/download/v123.0.1/chromium-v123.0.1-pack.tar"
+      return NextResponse.json(
+        { error: "Missing HTML content" },
+        { status: 400 }
       );
-
-      // 2. Load Fonts (Optional, but good for emojis/symbols)
-      // await chromium.font("https://github.com/googlefonts/noto-emoji/raw/main/fonts/NotoColorEmoji.ttf");
-
-      browser = await puppeteer.launch({
-        args: chromium.args,
-        defaultViewport: chromium.defaultViewport,
-        executablePath,
-        headless: chromium.headless,
-      });
     }
+
+    // 1. Point to your LOCAL Windows Chrome
+    // If you haven't set this in .env.local, we fallback to the default path
+    const executablePath =
+      process.env.CHROMIUM_PATH ||
+      "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
+
+    const browser = await puppeteer.launch({
+      executablePath,
+      headless: true,
+    });
 
     const page = await browser.newPage();
+
+    // 2. Render the HTML
     await page.setContent(html, { waitUntil: "networkidle0" });
 
+    // 3. Generate PDF
     const pdfBuffer = await page.pdf({
       format: "A4",
       printBackground: true,
@@ -52,6 +48,7 @@ export async function POST(req: NextRequest) {
 
     await browser.close();
 
+    // 4. Return the file
     return new NextResponse(pdfBuffer, {
       headers: {
         "Content-Type": "application/pdf",
@@ -59,10 +56,7 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error("PDF Gen Error:", error);
-    return NextResponse.json(
-      { error: "Failed to generate PDF", details: error.message },
-      { status: 500 }
-    );
+    console.error("Local PDF Gen Error:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

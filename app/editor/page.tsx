@@ -1,19 +1,17 @@
 "use client";
-import { useState, useEffect, Suspense } from "react"; // Added Suspense & useEffect
+import { useState, Suspense } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation"; // Added to read URL
+import { useSearchParams } from "next/navigation";
 import Editor from "@monaco-editor/react";
 import { templates } from "../templates/index";
-import { ArrowLeft, Download } from "lucide-react";
+import { ArrowLeft, Download, Printer } from "lucide-react";
 
-// Inner component that uses search params
 function EditorContent() {
   const searchParams = useSearchParams();
   const initialTemplateKey = searchParams.get(
     "template"
   ) as keyof typeof templates;
 
-  // Initialize with the URL param if valid, otherwise default to 'modern'
   const [selectedTemplate, setSelectedTemplate] = useState<
     keyof typeof templates
   >(
@@ -21,18 +19,14 @@ function EditorContent() {
       ? initialTemplateKey
       : "modern"
   );
-
-  // Set initial code based on the selected template
   const [code, setCode] = useState(templates[selectedTemplate]);
 
-  // --- States ---
   const [loading, setLoading] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [jobDesc, setJobDesc] = useState("");
   const [matchScore, setMatchScore] = useState<number | null>(null);
   const [scanning, setScanning] = useState(false);
 
-  // Switch template handler
   const handleTemplateChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const key = e.target.value as keyof typeof templates;
     setSelectedTemplate(key);
@@ -47,7 +41,8 @@ function EditorContent() {
           <meta charset="UTF-8">
           <script src="https://cdn.tailwindcss.com"></script>
           <style>
-            body { padding: 0; margin: 0; }
+            @page { margin: 0; size: auto; }
+            body { padding: 0; margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             ::-webkit-scrollbar { width: 0px; background: transparent; }
           </style>
         </head>
@@ -58,7 +53,8 @@ function EditorContent() {
     `;
   };
 
-  const handleDownload = async () => {
+  // --- STRATEGY 1: Server-Side (For Localhost) ---
+  const downloadViaServer = async () => {
     setLoading(true);
     try {
       const response = await fetch("/api/generate-pdf", {
@@ -66,7 +62,9 @@ function EditorContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ html: code }),
       });
-      if (!response.ok) throw new Error("Failed to generate");
+
+      if (!response.ok) throw new Error("Server generation failed");
+
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -77,9 +75,57 @@ function EditorContent() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (e) {
-      alert("Error generating PDF");
+      console.error(e);
+      // Fallback if server fails
+      alert("Local API failed. Switching to browser print...");
+      downloadViaClient();
     } finally {
       setLoading(false);
+    }
+  };
+
+  // --- STRATEGY 2: Client-Side (For Production/Vercel) ---
+  const downloadViaClient = () => {
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+
+    document.body.appendChild(iframe);
+    const doc = iframe.contentWindow?.document;
+
+    if (doc) {
+      doc.open();
+      doc.write(getPreviewHtml(code));
+      doc.close();
+
+      // Wait for Tailwind to load, then print
+      iframe.onload = () => {
+        setTimeout(() => {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+          // Cleanup
+          setTimeout(() => document.body.removeChild(iframe), 1000);
+        }, 500);
+      };
+    }
+  };
+
+  // --- THE DECISION MAKER ---
+  const handleDownload = () => {
+    // Check if we are on Localhost
+    const isLocal =
+      typeof window !== "undefined" &&
+      (window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1");
+
+    if (isLocal) {
+      downloadViaServer();
+    } else {
+      downloadViaClient();
     }
   };
 
@@ -149,8 +195,14 @@ function EditorContent() {
             disabled={loading}
             className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg font-medium flex items-center gap-2 shadow-lg shadow-blue-500/20 transition-all"
           >
-            <Download size={18} />
-            {loading ? "Generating..." : "Download PDF"}
+            {loading ? (
+              <span>Generating...</span>
+            ) : (
+              <>
+                <Printer size={18} />
+                <span>Save PDF</span>
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -260,7 +312,6 @@ function EditorContent() {
   );
 }
 
-// Main Page Component wrapped in Suspense for Next.js
 export default function EditorPage() {
   return (
     <Suspense
