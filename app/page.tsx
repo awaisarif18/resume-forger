@@ -3,9 +3,28 @@ import Link from "next/link";
 import { CheckCircle, Zap, Shield } from "lucide-react";
 
 export default function LandingPage() {
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "Resume Forger",
+    applicationCategory: "BusinessApplication",
+    operatingSystem: "Web",
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "USD",
+    },
+    featureList: "ATS Scanning, PDF Export, Real-time Editing",
+  };
+
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
+      {/* SEO SCRIPT MOVED HERE */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
 
       {/* HERO SECTION */}
       <section className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden">

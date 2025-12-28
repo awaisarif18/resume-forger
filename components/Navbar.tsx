@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { FileText, Github, Menu, X } from "lucide-react";
+import Image from "next/image"; // 1. Added Image import
+import { Github, Menu, X } from "lucide-react"; // Removed FileText
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -10,17 +11,24 @@ export default function Navbar() {
     <nav className="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          {/* Logo */}
+          {/* Logo Section */}
           <Link
             href="/"
             className="flex items-center gap-2 hover:opacity-80 transition-opacity"
             onClick={() => setIsOpen(false)}
           >
-            <div className="p-2 bg-blue-600 rounded-lg">
-              <FileText className="w-5 h-5 text-white" />
+            {/* 2. NEW LOGO IMPLEMENTATION */}
+            <div className="relative w-8 h-8">
+              <Image
+                src="/logo.png"
+                alt="Resume Forger Logo"
+                fill
+                className="object-contain rounded-md"
+                priority
+              />
             </div>
             <span className="font-bold text-xl text-gray-900 tracking-tight">
-              ResumeForge
+              Resume Forger
             </span>
           </Link>
 
